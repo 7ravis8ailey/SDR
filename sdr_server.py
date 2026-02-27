@@ -9,7 +9,7 @@ from sdr import SDR, acquire_device, release_device
 from demod import demodulate, DEMODS
 from spectrum import compute_spectrum, ascii_spectrum
 from scanner import scan_range
-from bands import BANDS, DIGITAL_CHANNELS, RTL_SDR_MIN_FREQ, RTL_SDR_MAX_FREQ
+from bands import BANDS, DIGITAL_CHANNELS, FREQUENCY_DB, RTL_SDR_MIN_FREQ, RTL_SDR_MAX_FREQ
 from digital import DigitalVoiceDecoder
 from adsb import ADSBDecoder
 from ism import ISMDecoder
@@ -407,6 +407,36 @@ def lookup_frequency(frequency_mhz: float) -> dict:
     or a band-based guess for unknown frequencies.
     """
     return resolve_frequency(frequency_mhz * 1e6)
+
+
+@mcp.tool
+def search_frequencies(query: str = "", protocol: str = "", decoder: str = "") -> list[dict]:
+    """Search the frequency phone book.
+
+    Filter by text (matches name and description), protocol (dmr, p25, analog_nfm, ...),
+    or decoder type (analog, digital, adsb, aprs, ism, pager).
+    Returns all entries sorted by frequency if no filters given.
+    """
+    results = []
+    q = query.lower()
+    for name, ch in FREQUENCY_DB.items():
+        if q and q not in name.lower() and q not in ch["description"].lower():
+            continue
+        if protocol and ch["protocol"] != protocol:
+            continue
+        if decoder and ch["decoder"] != decoder:
+            continue
+        results.append({
+            "name": name,
+            "frequency_mhz": round(ch["freq"] / 1e6, 4),
+            "protocol": ch["protocol"],
+            "decoder": ch["decoder"],
+            "mode": ch["mode"],
+            "tone": ch["tone"],
+            "description": ch["description"],
+        })
+    results.sort(key=lambda x: x["frequency_mhz"])
+    return results
 
 
 # --- ADS-B decoder tools ---

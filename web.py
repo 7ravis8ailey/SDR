@@ -16,8 +16,9 @@ from sdr import SDR, acquire_device, release_device, device_owner
 from demod import demodulate, DEMODS
 from spectrum import compute_spectrum
 from scanner import scan_range
-from bands import BANDS
+from bands import BANDS, FREQUENCY_DB
 from digital import DigitalVoiceDecoder
+from smart_tune import resolve_frequency
 
 log = logging.getLogger("sdr.web")
 MOCK = "--mock" in sys.argv
@@ -122,6 +123,78 @@ async def set_preset(request):
     if not MOCK and radio.device:
         radio.center_freq = freq
     return JSONResponse({"frequency_mhz": freq / 1e6, "mode": mode, "description": desc})
+
+
+async def get_phonebook(request):
+    q = request.query_params.get("q", "").lower()
+    protocol = request.query_params.get("protocol", "")
+    entries = []
+    for name, ch in FREQUENCY_DB.items():
+        if q and q not in name.lower() and q not in ch["description"].lower():
+            continue
+        if protocol and ch["protocol"] != protocol:
+            continue
+        entries.append({
+            "name": name,
+            "frequency_mhz": round(ch["freq"] / 1e6, 4),
+            "protocol": ch["protocol"],
+            "decoder": ch["decoder"],
+            "mode": ch["mode"],
+            "tone": ch["tone"],
+            "description": ch["description"],
+        })
+    entries.sort(key=lambda x: x["frequency_mhz"])
+    return JSONResponse(entries)
+
+
+async def web_smart_tune(request):
+    body = await request.json()
+    freq_mhz = body["freq_mhz"]
+    gain = body.get("gain", state["gain"])
+    info = resolve_frequency(freq_mhz * 1e6)
+    dec = info["decoder"]
+    mode = info["mode"]
+
+    # Stop any active streaming/decoding
+    if state["running"]:
+        state["running"] = False
+        await asyncio.sleep(0.2)
+        if not MOCK:
+            radio.close()
+            release_device("webui")
+    if decoder.active:
+        await asyncio.to_thread(decoder.stop)
+        if not MOCK:
+            release_device("digital")
+
+    state["freq"] = freq_mhz * 1e6
+    state["digital_active"] = False
+
+    if MOCK:
+        state["digital_active"] = True
+        return JSONResponse({**info, "status": "started (mock)"})
+
+    # WFM/AM use spectrum streaming; everything else uses dsd-fme subprocess
+    if mode in ("wfm", "am"):
+        if not acquire_device("webui"):
+            owner = device_owner()
+            return JSONResponse({"error": f"Device in use by {owner}."}, status_code=409)
+        gain_val = gain if gain == "auto" else float(gain)
+        radio.open(sample_rate=state["sample_rate"], center_freq=freq_mhz * 1e6, gain=gain_val)
+        state["mode"] = mode
+        state["running"] = True
+        return JSONResponse({**info, "status": "started"})
+
+    if not acquire_device("digital"):
+        owner = device_owner()
+        return JSONResponse({"error": f"Device in use by {owner}."}, status_code=409)
+    try:
+        await asyncio.to_thread(decoder.start, freq_mhz * 1e6, mode, gain, 0)
+        state["digital_active"] = True
+        return JSONResponse({**info, "status": "started"})
+    except Exception as e:
+        release_device("digital")
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 async def run_scan(request):
@@ -383,6 +456,8 @@ app = Starlette(
         Route("/api/gain", set_gain, methods=["POST"]),
         Route("/api/bands", get_bands, methods=["GET"]),
         Route("/api/preset", set_preset, methods=["POST"]),
+        Route("/api/phonebook", get_phonebook, methods=["GET"]),
+        Route("/api/smart-tune", web_smart_tune, methods=["POST"]),
         Route("/api/scan", run_scan, methods=["POST"]),
         Route("/api/state", get_state, methods=["GET"]),
         Route("/api/digital/start", digital_start, methods=["POST"]),

@@ -549,102 +549,205 @@ for (const canvas of [specCanvas, wfCanvas]) {
     });
 }
 
-// --- Presets ---
+// --- Phone Book ---
 
-const PRESET_GROUPS = {
-    "FM Radio": ["fm_"],
-    "Aviation": ["aviation_", "atis"],
-    "NOAA Weather": ["noaa_"],
+let phonebookData = [];
+let phonebookFilter = "all";
+
+const PHONEBOOK_GROUPS = {
+    "Public Safety": ["carter_", "ems_", "sycamore_", "elizabethton_"],
+    "State/Federal": ["tn_"],
+    "Ham Repeaters": ["wr4cc_", "k4lns_", "km4hdm_", "ae2ey_", "w4ysf_", "ke4ccb_", "kc4ayx_"],
+    "Weather": ["noaa_"],
     "Marine": ["marine_"],
-    "Public Safety": ["public_safety_"],
-    "ADS-B": ["adsb"],
-    "Carter County": ["carter_", "ems_", "sycamore_", "elizabethton_", "happy_valley_", "unaka_", "walmart_"],
+    "Other": ["aprs_"],
 };
 
-async function loadBands() {
-    const resp = await fetch("/api/bands");
-    const bands = await resp.json();
-    bandsData = bands; // store globally for bookmark markers
-    const container = $("presets");
-    container.innerHTML = "";
+const PROTOCOL_COLORS = {
+    analog_nfm: "#3fb950",
+    analog_am: "#3fb950",
+    analog_wfm: "#3fb950",
+    dmr: "#d29922",
+    p25: "#58a6ff",
+    nxdn: "#bc8cff",
+    dstar: "#f778ba",
+    ysf: "#f778ba",
+    aprs: "#79c0ff",
+    adsb: "#79c0ff",
+    ism: "#79c0ff",
+};
 
+function protocolLabel(protocol) {
+    const labels = {
+        analog_nfm: "NFM", analog_am: "AM", analog_wfm: "WFM",
+        dmr: "DMR", p25: "P25", nxdn: "NXDN", dstar: "D-STAR",
+        ysf: "YSF", aprs: "APRS", adsb: "ADS-B", ism: "ISM",
+    };
+    return labels[protocol] || protocol;
+}
+
+async function loadPhonebook() {
+    // Load phonebook entries
+    const resp = await fetch("/api/phonebook");
+    phonebookData = await resp.json();
+
+    // Also load bands for spectrum bookmark markers
+    const bandsResp = await fetch("/api/bands");
+    bandsData = await bandsResp.json();
+
+    renderPhonebook();
+
+    // Wire up search
+    $("phonebookSearch").addEventListener("input", renderPhonebook);
+}
+
+function filterPhonebook(filter) {
+    phonebookFilter = filter;
+    document.querySelectorAll(".filter-btn").forEach((b) =>
+        b.classList.toggle("active", b.dataset.filter === filter)
+    );
+    renderPhonebook();
+}
+
+function renderPhonebook() {
+    const container = $("phonebook");
+    container.innerHTML = "";
+    const query = ($("phonebookSearch")?.value || "").toLowerCase();
+
+    // Filter entries
+    let entries = phonebookData.filter((e) => {
+        if (query && !e.name.toLowerCase().includes(query)
+            && !e.description.toLowerCase().includes(query)
+            && !String(e.frequency_mhz).includes(query)) {
+            return false;
+        }
+        if (phonebookFilter === "analog" && !e.protocol.startsWith("analog")) return false;
+        if (phonebookFilter === "digital" && e.protocol.startsWith("analog")) return false;
+        return true;
+    });
+
+    // Group entries
+    const grouped = {};
     const matched = new Set();
 
-    for (const [groupName, prefixes] of Object.entries(PRESET_GROUPS)) {
-        const entries = Object.entries(bands).filter(([name]) =>
-            prefixes.some((p) => name.startsWith(p) || name === p)
+    for (const [groupName, prefixes] of Object.entries(PHONEBOOK_GROUPS)) {
+        const group = entries.filter((e) =>
+            prefixes.some((p) => e.name.startsWith(p))
         );
-        if (!entries.length) continue;
-        entries.forEach(([name]) => matched.add(name));
-
-        const group = document.createElement("div");
-        group.className = "preset-group";
-
-        const label = document.createElement("span");
-        label.className = "preset-group-label";
-        label.textContent = groupName;
-        group.appendChild(label);
-
-        const btns = document.createElement("div");
-        btns.className = "preset-group-buttons";
-
-        for (const [name, info] of entries) {
-            const btn = document.createElement("button");
-            btn.className = "preset-btn";
-            btn.textContent = name.replace(/_/g, " ");
-            btn.title = `${info.description} (${info.frequency_mhz} MHz, ${info.mode.toUpperCase()})`;
-            btn.onclick = async () => {
-                const r = await fetch("/api/preset", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name }),
-                });
-                const data = await r.json();
-                $("freqInput").value = data.frequency_mhz.toFixed(3);
-                if (window.updateFreqWidget) updateFreqWidget(data.frequency_mhz);
-                setMode(data.mode);
-                document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
-                btn.classList.add("active");
-            };
-            btns.appendChild(btn);
+        if (group.length) {
+            grouped[groupName] = group;
+            group.forEach((e) => matched.add(e.name));
         }
-        group.appendChild(btns);
-        container.appendChild(group);
     }
 
-    // Catch-all for unmatched presets
-    const unmatched = Object.entries(bands).filter(([name]) => !matched.has(name));
+    // Catch unmatched
+    const unmatched = entries.filter((e) => !matched.has(e.name));
     if (unmatched.length) {
-        const group = document.createElement("div");
-        group.className = "preset-group";
+        grouped["Other"] = [...(grouped["Other"] || []), ...unmatched];
+    }
+
+    if (!Object.keys(grouped).length) {
+        container.innerHTML = '<div class="phonebook-empty">No matching frequencies</div>';
+        return;
+    }
+
+    for (const [groupName, group] of Object.entries(grouped)) {
+        const section = document.createElement("div");
+        section.className = "phonebook-group";
+
         const label = document.createElement("span");
-        label.className = "preset-group-label";
-        label.textContent = "Other";
-        group.appendChild(label);
-        const btns = document.createElement("div");
-        btns.className = "preset-group-buttons";
-        for (const [name, info] of unmatched) {
-            const btn = document.createElement("button");
-            btn.className = "preset-btn";
-            btn.textContent = name.replace(/_/g, " ");
-            btn.title = `${info.description} (${info.frequency_mhz} MHz, ${info.mode.toUpperCase()})`;
-            btn.onclick = async () => {
-                const r = await fetch("/api/preset", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ name }),
-                });
-                const data = await r.json();
-                $("freqInput").value = data.frequency_mhz.toFixed(3);
-                if (window.updateFreqWidget) updateFreqWidget(data.frequency_mhz);
-                setMode(data.mode);
-                document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
-                btn.classList.add("active");
-            };
-            btns.appendChild(btn);
+        label.className = "phonebook-group-label";
+        label.textContent = groupName;
+        section.appendChild(label);
+
+        for (const entry of group) {
+            const row = document.createElement("div");
+            row.className = "phonebook-entry";
+            row.onclick = () => smartTune(entry.frequency_mhz);
+
+            const freq = document.createElement("span");
+            freq.className = "phonebook-freq";
+            freq.textContent = entry.frequency_mhz.toFixed(4);
+
+            const desc = document.createElement("span");
+            desc.className = "phonebook-desc";
+            desc.textContent = entry.description;
+
+            const badge = document.createElement("span");
+            badge.className = "protocol-badge";
+            badge.textContent = protocolLabel(entry.protocol);
+            badge.style.background = (PROTOCOL_COLORS[entry.protocol] || "#8b949e") + "22";
+            badge.style.color = PROTOCOL_COLORS[entry.protocol] || "#8b949e";
+
+            const meta = document.createElement("span");
+            meta.className = "phonebook-meta";
+            meta.appendChild(badge);
+            if (entry.tone) {
+                const tone = document.createElement("span");
+                tone.className = "tone-label";
+                tone.textContent = entry.tone;
+                meta.appendChild(tone);
+            }
+
+            row.appendChild(freq);
+            row.appendChild(desc);
+            row.appendChild(meta);
+            section.appendChild(row);
         }
-        group.appendChild(btns);
-        container.appendChild(group);
+
+        container.appendChild(section);
+    }
+}
+
+async function smartTune(freqMhz) {
+    const gain = $("gainSelect").value === "auto" ? "auto" : $("gainSlider").value;
+
+    // Update UI immediately
+    $("freqInput").value = freqMhz.toFixed(3);
+    if (window.updateFreqWidget) updateFreqWidget(freqMhz);
+    $("status").textContent = "Tuning...";
+    $("status").dataset.state = "reconnecting";
+
+    try {
+        const resp = await fetch("/api/smart-tune", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ freq_mhz: freqMhz, gain }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `Failed: ${resp.status}`);
+
+        // Determine what was started
+        if (data.decoder === "analog" && (data.mode === "wfm" || data.mode === "am")) {
+            running = true;
+            digitalActive = false;
+            $("startBtn").textContent = "Stop";
+            $("startBtn").classList.add("active");
+            $("status").textContent = "Running";
+            $("status").dataset.state = "running";
+        } else {
+            running = false;
+            digitalActive = true;
+            $("digitalBtn").textContent = "Stop";
+            $("digitalBtn").classList.add("active");
+            $("digitalStatus").textContent = `Monitoring ${freqMhz.toFixed(3)} MHz (${protocolLabel(data.protocol)})`;
+            $("status").textContent = "Digital Monitor";
+            $("status").dataset.state = "digital";
+        }
+
+        // Update mode buttons
+        const modeMap = { wfm: "wfm", am: "am", nfm: "nfm" };
+        const uiMode = modeMap[data.mode] || "nfm";
+        document.querySelectorAll(".mode-btn").forEach((b) =>
+            b.classList.toggle("active", b.dataset.mode === uiMode)
+        );
+
+        initAudio();
+        connect();
+    } catch (e) {
+        console.error("Smart tune error:", e);
+        $("status").textContent = "Error: " + e.message;
+        $("status").dataset.state = "stopped";
     }
 }
 
@@ -875,5 +978,5 @@ function initFreqWidget() {
 
 window.addEventListener("resize", initCanvases);
 initCanvases();
-loadBands();
+loadPhonebook();
 initFreqWidget();

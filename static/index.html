@@ -70,8 +70,14 @@
 
     <div id="panels">
         <div class="card">
-            <h2 class="card-header">Presets</h2>
-            <div id="presets"></div>
+            <h2 class="card-header">Phone Book</h2>
+            <input type="text" id="phonebookSearch" placeholder="Search frequencies...">
+            <div class="phonebook-filters">
+                <button class="filter-btn active" data-filter="all" onclick="filterPhonebook('all')">All</button>
+                <button class="filter-btn" data-filter="analog" onclick="filterPhonebook('analog')">Analog</button>
+                <button class="filter-btn" data-filter="digital" onclick="filterPhonebook('digital')">Digital</button>
+            </div>
+            <div id="phonebook"></div>
         </div>
         <div class="card-stack">
             <div class="card">
