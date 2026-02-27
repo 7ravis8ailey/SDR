@@ -13,6 +13,13 @@ const specCanvas = $("spectrum");
 const wfCanvas = $("waterfall");
 let specCtx, wfCtx;
 
+// Zoom/pan state
+let zoomLevel = 1;    // 1 = full span, 16 = max zoom
+let panCenter = 0.5;  // 0-1, center of visible window in FFT
+let isDragging = false;
+let dragStartX = 0;
+let dragStartPan = 0;
+
 function initCanvases() {
     const dpr = window.devicePixelRatio || 1;
     for (const c of [specCanvas, wfCanvas]) {
@@ -30,7 +37,22 @@ const SPEC_LEFT = 48;
 const SPEC_BOTTOM = 24;
 const SPEC_TOP = 8;
 
+function visibleSlice(arr) {
+    if (zoomLevel <= 1) return arr;
+    const half = (1 / zoomLevel) / 2;
+    const start = Math.max(0, Math.floor((panCenter - half) * arr.length));
+    const end = Math.min(arr.length, Math.ceil((panCenter + half) * arr.length));
+    return arr.slice(start, end);
+}
+
+// Bandwidth per mode in kHz (for filter overlay)
+const MODE_BANDWIDTHS = { wfm: 200, fm: 200, nfm: 12.5, am: 25 };
+
 function drawSpectrum(freqs, power, centerFreq) {
+    // Apply zoom/pan: slice to visible window
+    const visFreqs = visibleSlice(freqs);
+    const visPower = visibleSlice(power);
+
     const w = specCanvas.getBoundingClientRect().width;
     const h = specCanvas.getBoundingClientRect().height;
     const ctx = specCtx;
@@ -41,8 +63,8 @@ function drawSpectrum(freqs, power, centerFreq) {
     ctx.fillStyle = "#060a0f";
     ctx.fillRect(0, 0, w, h);
 
-    const minP = Math.min(...power);
-    const maxP = Math.max(...power);
+    const minP = Math.min(...visPower);
+    const maxP = Math.max(...visPower);
     const dbMin = Math.floor(minP / 10) * 10;
     const dbMax = Math.ceil(maxP / 10) * 10;
     const dbRange = dbMax - dbMin || 10;
@@ -64,11 +86,15 @@ function drawSpectrum(freqs, power, centerFreq) {
     }
 
     // Vertical frequency ticks
-    const freqStart = freqs[0];
-    const freqEnd = freqs[freqs.length - 1];
+    const freqStart = visFreqs[0];
+    const freqEnd = visFreqs[visFreqs.length - 1];
     const freqSpan = freqEnd - freqStart;
+
     let tickMhz = 0.5;
-    if (freqSpan < 1) tickMhz = 0.1;
+    if (freqSpan < 0.05) tickMhz = 0.005;
+    else if (freqSpan < 0.1) tickMhz = 0.01;
+    else if (freqSpan < 0.5) tickMhz = 0.05;
+    else if (freqSpan < 1) tickMhz = 0.1;
     else if (freqSpan < 3) tickMhz = 0.25;
     else if (freqSpan > 10) tickMhz = 1.0;
 
@@ -81,27 +107,46 @@ function drawSpectrum(freqs, power, centerFreq) {
         ctx.moveTo(x, SPEC_TOP);
         ctx.lineTo(x, SPEC_TOP + plotH);
         ctx.stroke();
-        ctx.fillText(f.toFixed(2), x, h - 6);
+        const decimals = tickMhz < 0.01 ? 4 : tickMhz < 0.1 ? 3 : 2;
+        ctx.fillText(f.toFixed(decimals), x, h - 6);
     }
 
     // Center frequency marker
-    const centerX = SPEC_LEFT + ((centerFreq - freqStart) / freqSpan) * plotW;
-    ctx.strokeStyle = "rgba(255, 80, 80, 0.5)";
-    ctx.setLineDash([4, 4]);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(centerX, SPEC_TOP);
-    ctx.lineTo(centerX, SPEC_TOP + plotH);
-    ctx.stroke();
-    ctx.setLineDash([]);
+    if (centerFreq >= freqStart && centerFreq <= freqEnd) {
+        const centerX = SPEC_LEFT + ((centerFreq - freqStart) / freqSpan) * plotW;
+        ctx.strokeStyle = "rgba(255, 80, 80, 0.5)";
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(centerX, SPEC_TOP);
+        ctx.lineTo(centerX, SPEC_TOP + plotH);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    // Bandwidth filter overlay
+    const tunedFreq = parseFloat($("freqInput").value);
+    const currentMode = document.querySelector(".mode-btn.active")?.dataset.mode || "wfm";
+    const bwKhz = MODE_BANDWIDTHS[currentMode] || 25;
+    const bwMhz = bwKhz / 1000;
+    const filterLeft = SPEC_LEFT + ((tunedFreq - bwMhz / 2 - freqStart) / freqSpan) * plotW;
+    const filterRight = SPEC_LEFT + ((tunedFreq + bwMhz / 2 - freqStart) / freqSpan) * plotW;
+    const filterW = filterRight - filterLeft;
+    if (filterRight > SPEC_LEFT && filterLeft < w) {
+        ctx.fillStyle = "rgba(88, 166, 255, 0.12)";
+        ctx.fillRect(Math.max(SPEC_LEFT, filterLeft), SPEC_TOP, Math.min(filterW, plotW), plotH);
+        ctx.strokeStyle = "rgba(88, 166, 255, 0.4)";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(Math.max(SPEC_LEFT, filterLeft), SPEC_TOP, Math.min(filterW, plotW), plotH);
+    }
 
     // Spectrum line
     ctx.strokeStyle = "#00d4aa";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    for (let i = 0; i < power.length; i++) {
-        const x = SPEC_LEFT + (i / power.length) * plotW;
-        const y = SPEC_TOP + plotH - ((power[i] - dbMin) / dbRange) * plotH;
+    for (let i = 0; i < visPower.length; i++) {
+        const x = SPEC_LEFT + (i / visPower.length) * plotW;
+        const y = SPEC_TOP + plotH - ((visPower[i] - dbMin) / dbRange) * plotH;
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
@@ -116,27 +161,55 @@ function drawSpectrum(freqs, power, centerFreq) {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Center freq label
-    ctx.fillStyle = "#8b949e";
-    ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText(centerFreq.toFixed(3) + " MHz", centerX, SPEC_TOP + 14);
+    // Bookmark markers
+    drawBookmarks(ctx, visFreqs, freqStart, freqEnd, freqSpan, plotW, plotH, h);
+
+    // Zoom indicator
+    if (zoomLevel > 1) {
+        ctx.fillStyle = "#8b949e";
+        ctx.font = "10px -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(zoomLevel.toFixed(1) + "x", w - 8, SPEC_TOP + 12);
+    }
+
     ctx.textAlign = "left";
 }
 
-function heatColor(v) {
-    if (v < 0.15) return [0, 0, Math.floor(v / 0.15 * 120)];
-    if (v < 0.3) return [0, Math.floor((v - 0.15) / 0.15 * 180), 120 + Math.floor((v - 0.15) / 0.15 * 135)];
-    if (v < 0.5) return [0, 180 + Math.floor((v - 0.3) / 0.2 * 75), Math.floor((1 - (v - 0.3) / 0.2) * 255)];
-    if (v < 0.75) return [Math.floor((v - 0.5) / 0.25 * 255), 255, 0];
-    return [255, Math.floor((1 - (v - 0.75) / 0.25) * 255), 0];
-}
+// Pre-computed 256-entry color LUT for waterfall (black→navy→cyan→green→yellow→red)
+const COLOR_LUT = new Uint8Array(256 * 3);
+(function buildColorLUT() {
+    const stops = [
+        [0, 0, 0, 0],
+        [0.15, 0, 0, 120],
+        [0.3, 0, 180, 255],
+        [0.5, 0, 255, 80],
+        [0.75, 255, 255, 0],
+        [1.0, 255, 0, 0],
+    ];
+    for (let i = 0; i < 256; i++) {
+        const v = i / 255;
+        let si = 0;
+        while (si < stops.length - 2 && v > stops[si + 1][0]) si++;
+        const [p0, r0, g0, b0] = stops[si];
+        const [p1, r1, g1, b1] = stops[si + 1];
+        const t = (v - p0) / (p1 - p0);
+        COLOR_LUT[i * 3] = r0 + (r1 - r0) * t;
+        COLOR_LUT[i * 3 + 1] = g0 + (g1 - g0) * t;
+        COLOR_LUT[i * 3 + 2] = b0 + (b1 - b0) * t;
+    }
+})();
+
+// Auto-leveling: exponentially smoothed min/max for waterfall
+let wfMin = -50, wfMax = 0;
+const WF_ALPHA = 0.05;
+
+// Bands data for bookmark markers (populated by loadBands)
+let bandsData = {};
 
 function drawWaterfall(power) {
     const w = wfCanvas.width;
     const h = wfCanvas.height;
     const ctx = wfCtx;
-    const dpr = window.devicePixelRatio || 1;
 
     // Shift down 1 pixel (in canvas coordinates)
     if (h > 1) {
@@ -144,21 +217,63 @@ function drawWaterfall(power) {
         ctx.putImageData(img, 0, 1);
     }
 
-    const minP = Math.min(...power);
-    const maxP = Math.max(...power);
-    const range = maxP - minP || 1;
+    // Apply zoom/pan: slice power to visible window
+    const vis = visibleSlice(power);
+
+    // Auto-level with exponential smoothing
+    const frameMin = Math.min(...vis);
+    const frameMax = Math.max(...vis);
+    wfMin += WF_ALPHA * (frameMin - wfMin);
+    wfMax += WF_ALPHA * (frameMax - wfMax);
+    const range = wfMax - wfMin || 1;
 
     const row = ctx.createImageData(w, 1);
     for (let i = 0; i < w; i++) {
-        const idx = Math.floor((i / w) * power.length);
-        const norm = (power[idx] - minP) / range;
-        const [r, g, b] = heatColor(norm);
-        row.data[i * 4] = r;
-        row.data[i * 4 + 1] = g;
-        row.data[i * 4 + 2] = b;
+        const idx = Math.floor((i / w) * vis.length);
+        const norm = Math.max(0, Math.min(1, (vis[idx] - wfMin) / range));
+        const ci = (norm * 255) | 0;
+        row.data[i * 4] = COLOR_LUT[ci * 3];
+        row.data[i * 4 + 1] = COLOR_LUT[ci * 3 + 1];
+        row.data[i * 4 + 2] = COLOR_LUT[ci * 3 + 2];
         row.data[i * 4 + 3] = 255;
     }
     ctx.putImageData(row, 0, 0);
+}
+
+function drawBookmarks(ctx, visFreqs, freqStart, freqEnd, freqSpan, plotW, plotH, canvasH) {
+    if (!Object.keys(bandsData).length) return;
+    const tunedFreq = parseFloat($("freqInput").value);
+    const y = SPEC_TOP + plotH; // bottom of plot area
+
+    ctx.font = "9px 'SF Mono', 'Cascadia Code', monospace";
+    ctx.textAlign = "center";
+
+    for (const [name, info] of Object.entries(bandsData)) {
+        const fMhz = info.frequency_mhz;
+        if (fMhz < freqStart || fMhz > freqEnd) continue;
+
+        const x = SPEC_LEFT + ((fMhz - freqStart) / freqSpan) * plotW;
+        const isTuned = Math.abs(fMhz - tunedFreq) < 0.001;
+
+        // Triangle marker
+        ctx.fillStyle = isTuned ? "#58a6ff" : "rgba(0, 212, 170, 0.7)";
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - 4, y + 8);
+        ctx.lineTo(x + 4, y + 8);
+        ctx.closePath();
+        ctx.fill();
+
+        // Vertical hairline
+        ctx.strokeStyle = isTuned ? "rgba(88, 166, 255, 0.3)" : "rgba(0, 212, 170, 0.15)";
+        ctx.lineWidth = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(x, SPEC_TOP);
+        ctx.lineTo(x, y);
+        ctx.stroke();
+    }
+
+    ctx.textAlign = "left";
 }
 
 // --- Audio ---
@@ -300,6 +415,7 @@ async function stopRadio() {
 
 async function tuneToFreq(mhz) {
     $("freqInput").value = mhz.toFixed(3);
+    if (window.updateFreqWidget) updateFreqWidget(mhz);
     await fetch("/api/tune", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -349,20 +465,89 @@ function gainChanged() {
     }
 }
 
-// --- Click-to-tune on spectrum and waterfall ---
+// --- Click-to-tune, zoom, pan on spectrum and waterfall ---
 
-function clickToTune(e, canvas) {
-    if (!currentFreqs.length) return;
+function pixelToFreq(e, canvas) {
+    if (!currentFreqs.length) return null;
     const rect = canvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
-    if (clickX < SPEC_LEFT) return;
+    if (clickX < SPEC_LEFT) return null;
     const x = (clickX - SPEC_LEFT) / (rect.width - SPEC_LEFT);
-    const freq = currentFreqs[0] + x * (currentFreqs[currentFreqs.length - 1] - currentFreqs[0]);
-    tuneToFreq(freq);
+    const vis = visibleSlice(currentFreqs);
+    return vis[0] + x * (vis[vis.length - 1] - vis[0]);
 }
 
-specCanvas.addEventListener("click", (e) => clickToTune(e, specCanvas));
-wfCanvas.addEventListener("click", (e) => clickToTune(e, wfCanvas));
+function clickToTune(e, canvas) {
+    if (isDragging) return; // don't tune on drag release
+    const freq = pixelToFreq(e, canvas);
+    if (freq !== null) tuneToFreq(freq);
+}
+
+// Zoom: mouse wheel
+function handleZoom(e) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -1 : 1;
+    const newZoom = Math.max(1, Math.min(16, zoomLevel * (1 + delta * 0.2)));
+
+    // Zoom toward mouse position
+    if (currentFreqs.length && newZoom > 1) {
+        const rect = e.target.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left - SPEC_LEFT) / (rect.width - SPEC_LEFT);
+        const mouseRel = panCenter - (1 / zoomLevel) / 2 + mouseX * (1 / zoomLevel);
+        panCenter = mouseRel;
+    }
+
+    zoomLevel = newZoom;
+    if (zoomLevel <= 1) { panCenter = 0.5; zoomLevel = 1; }
+
+    // Clamp pan so we don't go out of bounds
+    const half = (1 / zoomLevel) / 2;
+    panCenter = Math.max(half, Math.min(1 - half, panCenter));
+}
+
+// Pan: click-drag
+let dragMoved = false;
+function handleMouseDown(e) {
+    if (e.button !== 0) return;
+    const rect = e.target.getBoundingClientRect();
+    if (e.clientX - rect.left < SPEC_LEFT) return;
+    isDragging = true;
+    dragMoved = false;
+    dragStartX = e.clientX;
+    dragStartPan = panCenter;
+    e.target.style.cursor = "grabbing";
+}
+
+function handleMouseMove(e) {
+    if (!isDragging || !currentFreqs.length) return;
+    const rect = e.target.getBoundingClientRect();
+    const dx = e.clientX - dragStartX;
+    const pixelSpan = rect.width - SPEC_LEFT;
+    const panDelta = -(dx / pixelSpan) * (1 / zoomLevel);
+    panCenter = dragStartPan + panDelta;
+
+    const half = (1 / zoomLevel) / 2;
+    panCenter = Math.max(half, Math.min(1 - half, panCenter));
+
+    if (Math.abs(dx) > 3) dragMoved = true;
+}
+
+function handleMouseUp(e) {
+    if (!isDragging) return;
+    e.target.style.cursor = "crosshair";
+    isDragging = false;
+    if (!dragMoved) clickToTune(e, e.target);
+}
+
+for (const canvas of [specCanvas, wfCanvas]) {
+    canvas.addEventListener("wheel", handleZoom, { passive: false });
+    canvas.addEventListener("mousedown", handleMouseDown);
+    canvas.addEventListener("mousemove", handleMouseMove);
+    canvas.addEventListener("mouseup", handleMouseUp);
+    canvas.addEventListener("mouseleave", (e) => {
+        if (isDragging) { isDragging = false; canvas.style.cursor = "crosshair"; }
+    });
+}
 
 // --- Presets ---
 
@@ -379,6 +564,7 @@ const PRESET_GROUPS = {
 async function loadBands() {
     const resp = await fetch("/api/bands");
     const bands = await resp.json();
+    bandsData = bands; // store globally for bookmark markers
     const container = $("presets");
     container.innerHTML = "";
 
@@ -415,6 +601,7 @@ async function loadBands() {
                 });
                 const data = await r.json();
                 $("freqInput").value = data.frequency_mhz.toFixed(3);
+                if (window.updateFreqWidget) updateFreqWidget(data.frequency_mhz);
                 setMode(data.mode);
                 document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
                 btn.classList.add("active");
@@ -449,6 +636,7 @@ async function loadBands() {
                 });
                 const data = await r.json();
                 $("freqInput").value = data.frequency_mhz.toFixed(3);
+                if (window.updateFreqWidget) updateFreqWidget(data.frequency_mhz);
                 setMode(data.mode);
                 document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
                 btn.classList.add("active");
@@ -584,6 +772,7 @@ async function startDigital() {
         $("status").textContent = "Digital Monitor";
         $("status").dataset.state = "digital";
         $("freqInput").value = freq.toFixed(3);
+        if (window.updateFreqWidget) updateFreqWidget(freq);
         initAudio();
         connect();
     } catch (e) {
@@ -611,8 +800,80 @@ async function stopDigital() {
     $("status").dataset.state = "stopped";
 }
 
+// --- Per-Digit Frequency Widget (SDR++ style) ---
+
+function initFreqWidget() {
+    const container = document.querySelector(".freq-display");
+    if (!container) return;
+
+    const input = $("freqInput");
+    input.style.display = "none";
+    container.querySelectorAll(".freq-nudge").forEach((b) => b.remove());
+    const existingUnit = container.querySelector(".freq-unit");
+    if (existingUnit) existingUnit.remove();
+
+    const widget = document.createElement("div");
+    widget.className = "freq-widget";
+
+    // Place values in Hz: [100M, 10M, 1M, 100k, 10k, 1k, 100, 10, 1]
+    const placeValues = [100e6, 10e6, 1e6, 100e3, 10e3, 1e3, 100, 10, 1];
+    const digits = [];
+
+    for (let i = 0; i < 9; i++) {
+        if (i === 3 || i === 6) {
+            const dot = document.createElement("span");
+            dot.className = "freq-dot";
+            dot.textContent = ".";
+            widget.appendChild(dot);
+        }
+        const span = document.createElement("span");
+        span.className = "freq-digit";
+        span.textContent = "0";
+
+        span.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            const dir = e.deltaY < 0 ? 1 : -1;
+            const hz = parseFloat(input.value) * 1e6;
+            const newMhz = Math.max(24, Math.min(1766, (hz + dir * placeValues[i]) / 1e6));
+            tuneToFreq(newMhz);
+        }, { passive: false });
+
+        span.addEventListener("click", (e) => {
+            const rect = span.getBoundingClientRect();
+            const dir = e.clientY < rect.top + rect.height / 2 ? 1 : -1;
+            const hz = parseFloat(input.value) * 1e6;
+            const newMhz = Math.max(24, Math.min(1766, (hz + dir * placeValues[i]) / 1e6));
+            tuneToFreq(newMhz);
+        });
+
+        digits.push(span);
+        widget.appendChild(span);
+    }
+
+    const unit = document.createElement("span");
+    unit.className = "freq-unit freq-unit-label";
+    unit.textContent = "MHz";
+    widget.appendChild(unit);
+
+    container.insertBefore(widget, container.firstChild);
+
+    window.updateFreqWidget = function (mhz) {
+        const hz = Math.round(mhz * 1e6);
+        const str = String(hz).padStart(9, "0").slice(-9);
+        for (let i = 0; i < 9; i++) {
+            digits[i].textContent = str[i];
+            const leadingZero = i < 3 && !str.slice(0, i + 1).match(/[1-9]/);
+            digits[i].classList.toggle("dim", leadingZero);
+        }
+        input.value = mhz.toFixed(3);
+    };
+
+    updateFreqWidget(parseFloat(input.value));
+}
+
 // --- Init ---
 
 window.addEventListener("resize", initCanvases);
 initCanvases();
 loadBands();
+initFreqWidget();

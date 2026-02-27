@@ -118,6 +118,44 @@ h1 { color: var(--accent); font-size: var(--text-xl); font-weight: 600; white-sp
 .freq-readout:focus { outline: none; border-bottom-color: var(--accent); }
 .freq-unit { color: var(--text-muted); font-size: var(--text-lg); }
 
+/* Per-digit frequency widget (SDR++ style) */
+.freq-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    user-select: none;
+}
+.freq-digit {
+    font-family: var(--mono);
+    font-size: var(--text-freq);
+    font-weight: 300;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 2px 1px;
+    border-radius: 3px;
+    transition: background 0.12s, color 0.12s;
+    line-height: 1;
+}
+.freq-digit:hover {
+    background: var(--accent-muted);
+    color: var(--accent);
+}
+.freq-digit.dim { color: var(--text-muted); }
+.freq-digit.dim:hover { color: var(--accent); }
+.freq-dot {
+    font-family: var(--mono);
+    font-size: var(--text-freq);
+    font-weight: 300;
+    color: var(--text-muted);
+    padding: 0 1px;
+    line-height: 1;
+}
+.freq-unit-label {
+    margin-left: var(--space-sm);
+    font-size: var(--text-lg);
+    color: var(--text-muted);
+}
+
 .freq-nudge {
     background: var(--bg-elevated);
     border: 1px solid var(--border-default);
