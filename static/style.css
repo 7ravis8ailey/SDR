@@ -1,0 +1,35 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; color: #ccc; font-family: 'Courier New', monospace; padding: 12px; max-width: 1200px; margin: 0 auto; }
+header { display: flex; align-items: center; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid #333; }
+h1 { color: #0f0; font-size: 18px; flex-shrink: 0; }
+#status { flex: 1; font-size: 12px; color: #666; }
+button { background: #222; color: #0f0; border: 1px solid #444; padding: 5px 12px; cursor: pointer; font-family: inherit; font-size: 12px; border-radius: 3px; }
+button:hover { background: #333; }
+button:active { background: #0a0; color: #000; }
+button.active { background: #0a0; color: #000; }
+button:disabled { opacity: 0.4; cursor: default; }
+#display { padding: 10px 0; }
+canvas { width: 100%; background: #0a0a0a; display: block; border: 1px solid #2a2a2a; }
+#spectrum { height: 200px; }
+#waterfall { height: 150px; margin-top: 2px; }
+#controls { padding: 10px 0; border-bottom: 1px solid #333; }
+.control-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; flex-wrap: wrap; }
+.control-row label { width: 80px; text-align: right; color: #888; font-size: 12px; flex-shrink: 0; }
+input[type="number"] { background: #1a1a1a; color: #0f0; border: 1px solid #444; padding: 4px 8px; width: 110px; font-family: inherit; font-size: 13px; text-align: center; }
+input[type="range"] { width: 120px; accent-color: #0f0; }
+select { background: #1a1a1a; color: #0f0; border: 1px solid #444; padding: 4px; font-family: inherit; }
+#powerBar { width: 180px; height: 14px; background: #1a1a1a; border: 1px solid #444; border-radius: 2px; overflow: hidden; }
+#powerFill { height: 100%; background: linear-gradient(90deg, #0a0, #ff0, #f00); width: 0%; transition: width 0.15s; }
+#powerText { font-size: 12px; color: #0f0; min-width: 70px; }
+#presets { display: flex; align-items: center; gap: 6px; padding: 10px 0; flex-wrap: wrap; border-bottom: 1px solid #333; }
+#presets label { color: #888; font-size: 12px; }
+#presets button { font-size: 10px; padding: 3px 7px; }
+#scanner { padding: 10px 0; display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; }
+#scanner label { color: #888; font-size: 12px; padding-top: 5px; }
+#scanner input { width: 80px; }
+#scanResults { width: 100%; margin-top: 6px; }
+#scanResults table { width: 100%; border-collapse: collapse; font-size: 12px; }
+#scanResults th { text-align: left; color: #888; padding: 3px 8px; border-bottom: 1px solid #444; }
+#scanResults td { padding: 3px 8px; border-bottom: 1px solid #222; }
+#scanResults tr:hover { background: #222; cursor: pointer; }
+#gainValue { font-size: 12px; color: #888; min-width: 40px; }

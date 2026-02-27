@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "sdr": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory", "/Users/travisbailey/dev/projects/SDR",
+        "python", "sdr_server.py"
+      ]
+    }
+  }
+}

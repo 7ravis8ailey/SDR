@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SDR Lab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>SDR Lab</h1>
+        <div id="status">Stopped</div>
+        <button id="startBtn" onclick="toggleRadio()">Start</button>
+    </header>
+
+    <div id="display">
+        <canvas id="spectrum"></canvas>
+        <canvas id="waterfall"></canvas>
+    </div>
+
+    <div id="controls">
+        <div class="control-row">
+            <label>Freq (MHz):</label>
+            <button onclick="nudgeFreq(-1)">--</button>
+            <button onclick="nudgeFreq(-0.1)">-</button>
+            <input type="number" id="freqInput" value="100.000" step="0.1"
+                   onchange="tuneToFreq(parseFloat(this.value))">
+            <button onclick="nudgeFreq(0.1)">+</button>
+            <button onclick="nudgeFreq(1)">++</button>
+        </div>
+        <div class="control-row">
+            <label>Mode:</label>
+            <button class="mode-btn active" data-mode="wfm" onclick="setMode('wfm')">WFM</button>
+            <button class="mode-btn" data-mode="am" onclick="setMode('am')">AM</button>
+            <button class="mode-btn" data-mode="nfm" onclick="setMode('nfm')">NFM</button>
+        </div>
+        <div class="control-row">
+            <label>Gain:</label>
+            <select id="gainSelect" onchange="gainChanged()">
+                <option value="auto" selected>Auto</option>
+                <option value="manual">Manual</option>
+            </select>
+            <input type="range" id="gainSlider" min="0" max="50" value="20" step="0.9"
+                   disabled onchange="setGain(this.value)">
+            <span id="gainValue">auto</span>
+        </div>
+        <div class="control-row">
+            <label>Signal:</label>
+            <div id="powerBar"><div id="powerFill"></div></div>
+            <span id="powerText">-- dB</span>
+        </div>
+    </div>
+
+    <div id="presets">
+        <label>Presets:</label>
+    </div>
+
+    <div id="scanner">
+        <label>Scanner:</label>
+        <input type="number" id="scanStart" value="162.3" step="0.1" placeholder="Start MHz">
+        <span>-</span>
+        <input type="number" id="scanEnd" value="162.6" step="0.1" placeholder="End MHz">
+        <button id="scanBtn" onclick="runScan()">Scan</button>
+        <div id="scanResults"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
