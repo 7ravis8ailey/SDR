@@ -23,6 +23,10 @@ BANDS = {
     "public_safety_high": (174e6, "nfm", 12.5e3, "VHF public safety"),
     # ADS-B
     "adsb": (1090e6, "adsb", 2e6, "ADS-B aircraft tracking"),
+    # APRS
+    "aprs": (144.39e6, "nfm", 12.5e3, "APRS packet radio (144.390 MHz)"),
+    # ISM Band
+    "ism_433": (433.92e6, "nfm", 200e3, "ISM band 433.92 MHz (weather stations, sensors)"),
     # Carter County / Elizabethton, TN
     "carter_fire_dispatch": (154.295e6, "nfm", 12.5e3, "Carter County Fire Dispatch (PL 100.0)"),
     "carter_sheriff_holston": (155.535e6, "nfm", 12.5e3, "Carter County Sheriff - Holston Mtn (PL 100.0)"),
