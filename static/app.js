@@ -26,64 +26,110 @@ function initCanvases() {
     wfCtx.scale(dpr, dpr);
 }
 
+const SPEC_LEFT = 48;
+const SPEC_BOTTOM = 24;
+const SPEC_TOP = 8;
+
 function drawSpectrum(freqs, power, centerFreq) {
     const w = specCanvas.getBoundingClientRect().width;
     const h = specCanvas.getBoundingClientRect().height;
     const ctx = specCtx;
+    const plotW = w - SPEC_LEFT;
+    const plotH = h - SPEC_BOTTOM - SPEC_TOP;
 
-    ctx.fillStyle = "#0a0a0a";
+    // Clear
+    ctx.fillStyle = "#060a0f";
     ctx.fillRect(0, 0, w, h);
 
     const minP = Math.min(...power);
     const maxP = Math.max(...power);
-    const range = maxP - minP || 1;
+    const dbMin = Math.floor(minP / 10) * 10;
+    const dbMax = Math.ceil(maxP / 10) * 10;
+    const dbRange = dbMax - dbMin || 10;
+    const dbStep = dbRange <= 30 ? 5 : 10;
 
-    // Spectrum line
-    ctx.strokeStyle = "#0f0";
+    // Horizontal dB gridlines
+    ctx.strokeStyle = "rgba(48, 54, 61, 0.6)";
+    ctx.lineWidth = 0.5;
+    ctx.fillStyle = "#484f58";
+    ctx.font = "10px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "right";
+    for (let db = dbMin; db <= dbMax; db += dbStep) {
+        const y = SPEC_TOP + plotH - ((db - dbMin) / dbRange) * plotH;
+        ctx.beginPath();
+        ctx.moveTo(SPEC_LEFT, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+        ctx.fillText(db + " dB", SPEC_LEFT - 6, y + 3);
+    }
+
+    // Vertical frequency ticks
+    const freqStart = freqs[0];
+    const freqEnd = freqs[freqs.length - 1];
+    const freqSpan = freqEnd - freqStart;
+    let tickMhz = 0.5;
+    if (freqSpan < 1) tickMhz = 0.1;
+    else if (freqSpan < 3) tickMhz = 0.25;
+    else if (freqSpan > 10) tickMhz = 1.0;
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#484f58";
+    const firstTick = Math.ceil(freqStart / tickMhz) * tickMhz;
+    for (let f = firstTick; f <= freqEnd; f += tickMhz) {
+        const x = SPEC_LEFT + ((f - freqStart) / freqSpan) * plotW;
+        ctx.beginPath();
+        ctx.moveTo(x, SPEC_TOP);
+        ctx.lineTo(x, SPEC_TOP + plotH);
+        ctx.stroke();
+        ctx.fillText(f.toFixed(2), x, h - 6);
+    }
+
+    // Center frequency marker
+    const centerX = SPEC_LEFT + ((centerFreq - freqStart) / freqSpan) * plotW;
+    ctx.strokeStyle = "rgba(255, 80, 80, 0.5)";
+    ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1;
     ctx.beginPath();
+    ctx.moveTo(centerX, SPEC_TOP);
+    ctx.lineTo(centerX, SPEC_TOP + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Spectrum line
+    ctx.strokeStyle = "#00d4aa";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
     for (let i = 0; i < power.length; i++) {
-        const x = (i / power.length) * w;
-        const y = h - 18 - ((power[i] - minP) / range) * (h - 28);
+        const x = SPEC_LEFT + (i / power.length) * plotW;
+        const y = SPEC_TOP + plotH - ((power[i] - dbMin) / dbRange) * plotH;
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
 
-    // Fill under curve
-    ctx.lineTo(w, h - 18);
-    ctx.lineTo(0, h - 18);
+    // Gradient fill under curve
+    ctx.lineTo(SPEC_LEFT + plotW, SPEC_TOP + plotH);
+    ctx.lineTo(SPEC_LEFT, SPEC_TOP + plotH);
     ctx.closePath();
-    ctx.fillStyle = "rgba(0, 255, 0, 0.05)";
+    const grad = ctx.createLinearGradient(0, SPEC_TOP, 0, SPEC_TOP + plotH);
+    grad.addColorStop(0, "rgba(0, 212, 170, 0.15)");
+    grad.addColorStop(1, "rgba(0, 212, 170, 0.01)");
+    ctx.fillStyle = grad;
     ctx.fill();
 
-    // Center frequency marker
-    ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(w / 2, 0);
-    ctx.lineTo(w / 2, h - 18);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Labels
-    ctx.fillStyle = "#666";
-    ctx.font = "11px monospace";
-    ctx.fillText(freqs[0].toFixed(2) + " MHz", 4, h - 4);
-    ctx.fillText(centerFreq.toFixed(3) + " MHz", w / 2 - 35, 12);
-    ctx.textAlign = "right";
-    ctx.fillText(freqs[freqs.length - 1].toFixed(2) + " MHz", w - 4, h - 4);
+    // Center freq label
+    ctx.fillStyle = "#8b949e";
+    ctx.font = "11px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(centerFreq.toFixed(3) + " MHz", centerX, SPEC_TOP + 14);
     ctx.textAlign = "left";
-
-    // dB scale
-    ctx.fillText(maxP.toFixed(0) + " dB", 4, 22);
-    ctx.fillText(minP.toFixed(0) + " dB", 4, h - 22);
 }
 
 function heatColor(v) {
-    if (v < 0.25) return [0, Math.floor(v * 4 * 255), 255];
-    if (v < 0.5) return [0, 255, Math.floor((1 - (v - 0.25) * 4) * 255)];
-    if (v < 0.75) return [Math.floor((v - 0.5) * 4 * 255), 255, 0];
-    return [255, Math.floor((1 - (v - 0.75) * 4) * 255), 0];
+    if (v < 0.15) return [0, 0, Math.floor(v / 0.15 * 120)];
+    if (v < 0.3) return [0, Math.floor((v - 0.15) / 0.15 * 180), 120 + Math.floor((v - 0.15) / 0.15 * 135)];
+    if (v < 0.5) return [0, 180 + Math.floor((v - 0.3) / 0.2 * 75), Math.floor((1 - (v - 0.3) / 0.2) * 255)];
+    if (v < 0.75) return [Math.floor((v - 0.5) / 0.25 * 255), 255, 0];
+    return [255, Math.floor((1 - (v - 0.75) / 0.25) * 255), 0];
 }
 
 function drawWaterfall(power) {
@@ -181,6 +227,7 @@ function connect() {
         console.log("WebSocket closed, running:", running, "digital:", digitalActive);
         if (running || digitalActive) {
             $("status").textContent = "Reconnecting...";
+            $("status").dataset.state = "reconnecting";
             setTimeout(connect, 1500);
         }
     };
@@ -210,6 +257,7 @@ async function startRadio() {
 
     $("startBtn").disabled = true;
     $("status").textContent = "Starting...";
+    $("status").dataset.state = "reconnecting";
 
     try {
         const resp = await fetch("/api/start", {
@@ -223,11 +271,13 @@ async function startRadio() {
         $("startBtn").textContent = "Stop";
         $("startBtn").classList.add("active");
         $("status").textContent = "Running";
+        $("status").dataset.state = "running";
         initAudio();
         connect();
     } catch (e) {
         console.error("Start error:", e);
         $("status").textContent = "Error: " + e.message;
+        $("status").dataset.state = "stopped";
     } finally {
         $("startBtn").disabled = false;
     }
@@ -245,6 +295,7 @@ async function stopRadio() {
     $("startBtn").textContent = "Start";
     $("startBtn").classList.remove("active");
     $("status").textContent = "Stopped";
+    $("status").dataset.state = "stopped";
 }
 
 async function tuneToFreq(mhz) {
@@ -298,39 +349,114 @@ function gainChanged() {
     }
 }
 
-// --- Click-to-tune on spectrum ---
+// --- Click-to-tune on spectrum and waterfall ---
 
-specCanvas.addEventListener("click", (e) => {
+function clickToTune(e, canvas) {
     if (!currentFreqs.length) return;
-    const rect = specCanvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width;
-    const freq =
-        currentFreqs[0] +
-        x * (currentFreqs[currentFreqs.length - 1] - currentFreqs[0]);
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    if (clickX < SPEC_LEFT) return;
+    const x = (clickX - SPEC_LEFT) / (rect.width - SPEC_LEFT);
+    const freq = currentFreqs[0] + x * (currentFreqs[currentFreqs.length - 1] - currentFreqs[0]);
     tuneToFreq(freq);
-});
+}
+
+specCanvas.addEventListener("click", (e) => clickToTune(e, specCanvas));
+wfCanvas.addEventListener("click", (e) => clickToTune(e, wfCanvas));
 
 // --- Presets ---
+
+const PRESET_GROUPS = {
+    "FM Radio": ["fm_"],
+    "Aviation": ["aviation_", "atis"],
+    "NOAA Weather": ["noaa_"],
+    "Marine": ["marine_"],
+    "Public Safety": ["public_safety_"],
+    "ADS-B": ["adsb"],
+    "Carter County": ["carter_", "ems_", "sycamore_", "elizabethton_", "happy_valley_", "unaka_", "walmart_"],
+};
 
 async function loadBands() {
     const resp = await fetch("/api/bands");
     const bands = await resp.json();
     const container = $("presets");
-    for (const [name, info] of Object.entries(bands)) {
-        const btn = document.createElement("button");
-        btn.textContent = name.replace(/_/g, " ");
-        btn.title = `${info.description} (${info.frequency_mhz} MHz, ${info.mode.toUpperCase()})`;
-        btn.onclick = async () => {
-            const resp = await fetch("/api/preset", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name }),
-            });
-            const data = await resp.json();
-            $("freqInput").value = data.frequency_mhz.toFixed(3);
-            setMode(data.mode);
-        };
-        container.appendChild(btn);
+    container.innerHTML = "";
+
+    const matched = new Set();
+
+    for (const [groupName, prefixes] of Object.entries(PRESET_GROUPS)) {
+        const entries = Object.entries(bands).filter(([name]) =>
+            prefixes.some((p) => name.startsWith(p) || name === p)
+        );
+        if (!entries.length) continue;
+        entries.forEach(([name]) => matched.add(name));
+
+        const group = document.createElement("div");
+        group.className = "preset-group";
+
+        const label = document.createElement("span");
+        label.className = "preset-group-label";
+        label.textContent = groupName;
+        group.appendChild(label);
+
+        const btns = document.createElement("div");
+        btns.className = "preset-group-buttons";
+
+        for (const [name, info] of entries) {
+            const btn = document.createElement("button");
+            btn.className = "preset-btn";
+            btn.textContent = name.replace(/_/g, " ");
+            btn.title = `${info.description} (${info.frequency_mhz} MHz, ${info.mode.toUpperCase()})`;
+            btn.onclick = async () => {
+                const r = await fetch("/api/preset", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name }),
+                });
+                const data = await r.json();
+                $("freqInput").value = data.frequency_mhz.toFixed(3);
+                setMode(data.mode);
+                document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+            };
+            btns.appendChild(btn);
+        }
+        group.appendChild(btns);
+        container.appendChild(group);
+    }
+
+    // Catch-all for unmatched presets
+    const unmatched = Object.entries(bands).filter(([name]) => !matched.has(name));
+    if (unmatched.length) {
+        const group = document.createElement("div");
+        group.className = "preset-group";
+        const label = document.createElement("span");
+        label.className = "preset-group-label";
+        label.textContent = "Other";
+        group.appendChild(label);
+        const btns = document.createElement("div");
+        btns.className = "preset-group-buttons";
+        for (const [name, info] of unmatched) {
+            const btn = document.createElement("button");
+            btn.className = "preset-btn";
+            btn.textContent = name.replace(/_/g, " ");
+            btn.title = `${info.description} (${info.frequency_mhz} MHz, ${info.mode.toUpperCase()})`;
+            btn.onclick = async () => {
+                const r = await fetch("/api/preset", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ name }),
+                });
+                const data = await r.json();
+                $("freqInput").value = data.frequency_mhz.toFixed(3);
+                setMode(data.mode);
+                document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
+                btn.classList.add("active");
+            };
+            btns.appendChild(btn);
+        }
+        group.appendChild(btns);
+        container.appendChild(group);
     }
 }
 
@@ -357,7 +483,7 @@ async function runScan() {
         html += `<td>${s.freq_mhz.toFixed(3)}</td><td>${s.power_db}</td></tr>`;
     }
     html += "</table>";
-    if (!signals.length) html = '<div style="color:#666;font-size:12px;padding:4px">No signals found</div>';
+    if (!signals.length) html = '<div style="color:#484f58;font-size:12px;padding:8px">No signals found</div>';
     $("scanResults").innerHTML = html;
 
     btn.disabled = false;
@@ -401,23 +527,22 @@ function showDigitalOverlay(msg) {
     const h = specCanvas.getBoundingClientRect().height;
     const ctx = specCtx;
 
-    ctx.fillStyle = "#0a0a0a";
+    ctx.fillStyle = "#060a0f";
     ctx.fillRect(0, 0, w, h);
 
-    ctx.fillStyle = "#f80";
-    ctx.font = "16px monospace";
+    ctx.fillStyle = "#d29922";
+    ctx.font = "18px -apple-system, BlinkMacSystemFont, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(`Monitoring ${msg.freq_mhz.toFixed(3)} MHz`, w / 2, h / 2 - 10);
-    ctx.font = "12px monospace";
-    ctx.fillStyle = "#888";
+    ctx.font = "13px -apple-system, BlinkMacSystemFont, sans-serif";
+    ctx.fillStyle = "#8b949e";
     ctx.fillText(`Mode: ${msg.mode.toUpperCase()}`, w / 2, h / 2 + 15);
     ctx.textAlign = "left";
 
-    // Show calls in digitalCalls div
     const callsDiv = $("digitalCalls");
     if (msg.calls && msg.calls.length) {
         callsDiv.innerHTML = msg.calls
-            .map((c) => `<div><span style="color:#666">${c.time}</span> ${c.message}</div>`)
+            .map((c) => `<div><span style="color:#484f58">${c.time}</span> ${c.message}</div>`)
             .join("");
     }
 }
@@ -457,6 +582,7 @@ async function startDigital() {
         $("digitalBtn").classList.add("active");
         $("digitalStatus").textContent = `Monitoring ${freq.toFixed(3)} MHz (${mode.toUpperCase()})`;
         $("status").textContent = "Digital Monitor";
+        $("status").dataset.state = "digital";
         $("freqInput").value = freq.toFixed(3);
         initAudio();
         connect();
@@ -482,6 +608,7 @@ async function stopDigital() {
     $("digitalStatus").textContent = "";
     $("digitalCalls").innerHTML = "";
     $("status").textContent = "Stopped";
+    $("status").dataset.state = "stopped";
 }
 
 // --- Init ---

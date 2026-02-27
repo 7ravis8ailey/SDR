@@ -8,9 +8,22 @@
 </head>
 <body>
     <header>
-        <h1>SDR Lab</h1>
-        <div id="status">Stopped</div>
-        <button id="startBtn" onclick="toggleRadio()">Start</button>
+        <div class="header-left">
+            <h1>SDR Lab</h1>
+            <span id="status" class="status-chip" data-state="stopped">Stopped</span>
+        </div>
+        <div class="freq-display">
+            <button class="freq-nudge" onclick="nudgeFreq(-1)">&#x25C0;&#x25C0;</button>
+            <button class="freq-nudge" onclick="nudgeFreq(-0.1)">&#x25C0;</button>
+            <input type="number" id="freqInput" class="freq-readout" value="100.000" step="0.1"
+                   onchange="tuneToFreq(parseFloat(this.value))">
+            <span class="freq-unit">MHz</span>
+            <button class="freq-nudge" onclick="nudgeFreq(0.1)">&#x25B6;</button>
+            <button class="freq-nudge" onclick="nudgeFreq(1)">&#x25B6;&#x25B6;</button>
+        </div>
+        <div class="header-right">
+            <button id="startBtn" onclick="toggleRadio()">Start</button>
+        </div>
     </header>
 
     <div id="display">
@@ -19,23 +32,16 @@
     </div>
 
     <div id="controls">
-        <div class="control-row">
-            <label>Freq (MHz):</label>
-            <button onclick="nudgeFreq(-1)">--</button>
-            <button onclick="nudgeFreq(-0.1)">-</button>
-            <input type="number" id="freqInput" value="100.000" step="0.1"
-                   onchange="tuneToFreq(parseFloat(this.value))">
-            <button onclick="nudgeFreq(0.1)">+</button>
-            <button onclick="nudgeFreq(1)">++</button>
+        <div class="control-group">
+            <span class="control-label">Mode</span>
+            <div class="btn-group">
+                <button class="mode-btn active" data-mode="wfm" onclick="setMode('wfm')">WFM</button>
+                <button class="mode-btn" data-mode="am" onclick="setMode('am')">AM</button>
+                <button class="mode-btn" data-mode="nfm" onclick="setMode('nfm')">NFM</button>
+            </div>
         </div>
-        <div class="control-row">
-            <label>Mode:</label>
-            <button class="mode-btn active" data-mode="wfm" onclick="setMode('wfm')">WFM</button>
-            <button class="mode-btn" data-mode="am" onclick="setMode('am')">AM</button>
-            <button class="mode-btn" data-mode="nfm" onclick="setMode('nfm')">NFM</button>
-        </div>
-        <div class="control-row">
-            <label>Gain:</label>
+        <div class="control-group">
+            <span class="control-label">Gain</span>
             <select id="gainSelect" onchange="gainChanged()">
                 <option value="auto" selected>Auto</option>
                 <option value="manual">Manual</option>
@@ -44,13 +50,13 @@
                    disabled onchange="setGain(this.value)">
             <span id="gainValue">auto</span>
         </div>
-        <div class="control-row">
-            <label>Signal:</label>
+        <div class="control-group">
+            <span class="control-label">Signal</span>
             <div id="powerBar"><div id="powerFill"></div></div>
             <span id="powerText">-- dB</span>
         </div>
-        <div class="control-row">
-            <label>Record:</label>
+        <div class="control-group">
+            <span class="control-label">Record</span>
             <select id="recordDuration">
                 <option value="5">5s</option>
                 <option value="10" selected>10s</option>
@@ -62,34 +68,41 @@
         </div>
     </div>
 
-    <div id="presets">
-        <label>Presets:</label>
-    </div>
-
-    <div id="scanner">
-        <label>Scanner:</label>
-        <input type="number" id="scanStart" value="162.3" step="0.1" placeholder="Start MHz">
-        <span>-</span>
-        <input type="number" id="scanEnd" value="162.6" step="0.1" placeholder="End MHz">
-        <button id="scanBtn" onclick="runScan()">Scan</button>
-        <div id="scanResults"></div>
-    </div>
-
-    <div id="digital">
-        <label>Monitor:</label>
-        <input type="number" id="digitalFreq" value="154.295" step="0.001" placeholder="Freq MHz">
-        <select id="digitalMode">
-            <option value="nfm" selected>NFM</option>
-            <option value="am">AM</option>
-            <option value="wfm">WFM</option>
-            <option value="auto">Digital Auto</option>
-            <option value="dmr">DMR</option>
-            <option value="p25">P25</option>
-            <option value="nxdn">NXDN</option>
-        </select>
-        <button id="digitalBtn" onclick="toggleDigital()">Monitor</button>
-        <div id="digitalStatus"></div>
-        <div id="digitalCalls"></div>
+    <div id="panels">
+        <div class="card">
+            <h2 class="card-header">Presets</h2>
+            <div id="presets"></div>
+        </div>
+        <div class="card-stack">
+            <div class="card">
+                <h2 class="card-header">Scanner</h2>
+                <div class="scanner-inputs">
+                    <input type="number" id="scanStart" value="162.3" step="0.1" placeholder="Start">
+                    <span class="range-dash">&mdash;</span>
+                    <input type="number" id="scanEnd" value="162.6" step="0.1" placeholder="End">
+                    <button id="scanBtn" onclick="runScan()">Scan</button>
+                </div>
+                <div id="scanResults"></div>
+            </div>
+            <div class="card">
+                <h2 class="card-header">Digital Monitor</h2>
+                <div class="digital-inputs">
+                    <input type="number" id="digitalFreq" value="154.295" step="0.001" placeholder="Freq MHz">
+                    <select id="digitalMode">
+                        <option value="nfm" selected>NFM</option>
+                        <option value="am">AM</option>
+                        <option value="wfm">WFM</option>
+                        <option value="auto">Digital Auto</option>
+                        <option value="dmr">DMR</option>
+                        <option value="p25">P25</option>
+                        <option value="nxdn">NXDN</option>
+                    </select>
+                    <button id="digitalBtn" onclick="toggleDigital()">Monitor</button>
+                </div>
+                <div id="digitalStatus"></div>
+                <div id="digitalCalls"></div>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>
