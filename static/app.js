@@ -4,6 +4,7 @@ let audioCtx = null;
 let nextPlayTime = 0;
 let currentFreqs = [];
 let running = false;
+let digitalActive = false;
 const AUDIO_RATE = 48000;
 
 // --- Spectrum & Waterfall ---
@@ -164,6 +165,8 @@ function connect() {
                 drawSpectrum(msg.freqs, msg.power, msg.center_freq);
                 drawWaterfall(msg.power);
                 updatePower(msg.peak_power);
+            } else if (msg.type === "digital") {
+                showDigitalOverlay(msg);
             }
         } else {
             playAudio(event.data);
@@ -175,8 +178,8 @@ function connect() {
     };
 
     ws.onclose = () => {
-        console.log("WebSocket closed, running:", running);
-        if (running) {
+        console.log("WebSocket closed, running:", running, "digital:", digitalActive);
+        if (running || digitalActive) {
             $("status").textContent = "Reconnecting...";
             setTimeout(connect, 1500);
         }
@@ -359,6 +362,96 @@ async function runScan() {
 
     btn.disabled = false;
     btn.textContent = "Scan";
+}
+
+// --- Digital Monitor ---
+
+function showDigitalOverlay(msg) {
+    const w = specCanvas.getBoundingClientRect().width;
+    const h = specCanvas.getBoundingClientRect().height;
+    const ctx = specCtx;
+
+    ctx.fillStyle = "#0a0a0a";
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.fillStyle = "#f80";
+    ctx.font = "16px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`Monitoring ${msg.freq_mhz.toFixed(3)} MHz`, w / 2, h / 2 - 10);
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "#888";
+    ctx.fillText(`Mode: ${msg.mode.toUpperCase()}`, w / 2, h / 2 + 15);
+    ctx.textAlign = "left";
+
+    // Show calls in digitalCalls div
+    const callsDiv = $("digitalCalls");
+    if (msg.calls && msg.calls.length) {
+        callsDiv.innerHTML = msg.calls
+            .map((c) => `<div><span style="color:#666">${c.time}</span> ${c.message}</div>`)
+            .join("");
+    }
+}
+
+async function toggleDigital() {
+    if (digitalActive) {
+        await stopDigital();
+    } else {
+        await startDigital();
+    }
+}
+
+async function startDigital() {
+    const freq = parseFloat($("digitalFreq").value);
+    const mode = $("digitalMode").value;
+    const gain = $("gainSelect").value === "auto" ? "auto" : $("gainSlider").value;
+
+    $("digitalBtn").disabled = true;
+    $("digitalStatus").textContent = "Starting monitor...";
+
+    try {
+        // Stop spectrum streaming if active
+        if (running) {
+            await stopRadio();
+        }
+
+        const resp = await fetch("/api/digital/start", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ freq_mhz: freq, mode, gain }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `Failed: ${resp.status}`);
+
+        digitalActive = true;
+        $("digitalBtn").textContent = "Stop";
+        $("digitalBtn").classList.add("active");
+        $("digitalStatus").textContent = `Monitoring ${freq.toFixed(3)} MHz (${mode.toUpperCase()})`;
+        $("status").textContent = "Digital Monitor";
+        $("freqInput").value = freq.toFixed(3);
+        initAudio();
+        connect();
+    } catch (e) {
+        console.error("Digital start error:", e);
+        $("digitalStatus").textContent = "Error: " + e.message;
+    } finally {
+        $("digitalBtn").disabled = false;
+    }
+}
+
+async function stopDigital() {
+    digitalActive = false;
+    if (ws) ws.close();
+    ws = null;
+    if (audioCtx) {
+        audioCtx.close();
+        audioCtx = null;
+    }
+    await fetch("/api/digital/stop", { method: "POST" });
+    $("digitalBtn").textContent = "Monitor";
+    $("digitalBtn").classList.remove("active");
+    $("digitalStatus").textContent = "";
+    $("digitalCalls").innerHTML = "";
+    $("status").textContent = "Stopped";
 }
 
 // --- Init ---

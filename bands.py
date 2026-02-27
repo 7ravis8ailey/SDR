@@ -23,6 +23,18 @@ BANDS = {
     "public_safety_high": (174e6, "nfm", 12.5e3, "VHF public safety"),
     # ADS-B
     "adsb": (1090e6, "adsb", 2e6, "ADS-B aircraft tracking"),
+    # Carter County / Elizabethton, TN
+    "carter_fire_dispatch": (154.295e6, "nfm", 12.5e3, "Carter County Fire Dispatch (PL 100.0)"),
+    "carter_sheriff_holston": (155.535e6, "nfm", 12.5e3, "Carter County Sheriff - Holston Mtn (PL 100.0)"),
+    "carter_sheriff_roan": (155.760e6, "nfm", 12.5e3, "Carter County Sheriff - Roan Mtn (PL 141.3)"),
+    "ems_holston": (151.3925e6, "nfm", 12.5e3, "EMS/Rescue Squad - Holston Mtn (DPL 025)"),
+    "ems_white_rock": (151.0475e6, "nfm", 12.5e3, "EMS/Rescue Squad - White Rock (DPL 025)"),
+    "sycamore_hospital": (155.340e6, "nfm", 12.5e3, "Sycamore Shoals Hospital HEAR"),
+    "ems_dispatch_backup": (155.160e6, "nfm", 12.5e3, "EMS Dispatch Backup (PL 179.9)"),
+    "happy_valley_hs": (464.550e6, "nfm", 12.5e3, "Happy Valley High School (PL 67.0)"),
+    "unaka_hs": (462.575e6, "nfm", 12.5e3, "Unaka High School (DPL 053)"),
+    "elizabethton_pd_tac": (155.940e6, "nfm", 12.5e3, "Elizabethton PD Tac (PL 100.0)"),
+    "walmart_elizabethton": (154.570e6, "nfm", 12.5e3, "Walmart Elizabethton"),
 }
 
 # RTL-SDR Blog V4 (R828D tuner) frequency range

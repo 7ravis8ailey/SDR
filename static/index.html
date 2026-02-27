@@ -64,6 +64,23 @@
         <div id="scanResults"></div>
     </div>
 
+    <div id="digital">
+        <label>Monitor:</label>
+        <input type="number" id="digitalFreq" value="154.295" step="0.001" placeholder="Freq MHz">
+        <select id="digitalMode">
+            <option value="nfm" selected>NFM</option>
+            <option value="am">AM</option>
+            <option value="wfm">WFM</option>
+            <option value="auto">Digital Auto</option>
+            <option value="dmr">DMR</option>
+            <option value="p25">P25</option>
+            <option value="nxdn">NXDN</option>
+        </select>
+        <button id="digitalBtn" onclick="toggleDigital()">Monitor</button>
+        <div id="digitalStatus"></div>
+        <div id="digitalCalls"></div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
