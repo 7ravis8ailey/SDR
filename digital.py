@@ -61,6 +61,10 @@ class DigitalVoiceDecoder:
         if self.active:
             self.stop()
 
+        # Normalize gain at boundary
+        if gain != "auto":
+            gain = str(round(float(gain)))
+
         self.frequency = frequency_hz
         self.mode = mode
         freq_mhz = frequency_hz / 1e6
@@ -83,7 +87,7 @@ class DigitalVoiceDecoder:
         """Launch dsd-fme with RTL input and UDP audio output."""
         self._udp_port = _find_free_port()
 
-        gain_val = 26 if gain == "auto" else int(float(gain))
+        gain_val = 26 if gain == "auto" else int(gain)
         freq_str = f"{frequency_hz / 1e6:.6f}M"
 
         cmd = [
@@ -98,6 +102,7 @@ class DigitalVoiceDecoder:
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
 
         # UDP listener for decoded audio
@@ -134,6 +139,7 @@ class DigitalVoiceDecoder:
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            start_new_session=True,
         )
 
         self._audio_thread = threading.Thread(target=self._pipe_audio_loop, daemon=True)

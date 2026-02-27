@@ -36,8 +36,12 @@ def open_device(
     if not acquire_device("mcp"):
         return {"error": "Device in use. Stop other consumers first."}
 
-    gain_value = gain if gain == "auto" else float(gain)
-    radio.open(sample_rate=sample_rate, center_freq=freq_hz, gain=gain_value)
+    try:
+        gain_value = gain if gain == "auto" else float(gain)
+        radio.open(sample_rate=sample_rate, center_freq=freq_hz, gain=gain_value)
+    except Exception as e:
+        release_device("mcp")
+        return {"error": f"Failed to open device: {e}"}
 
     return {
         "status": "open",

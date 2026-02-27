@@ -1331,6 +1331,8 @@ dependencies = [
     { name = "scipy" },
     { name = "setuptools" },
     { name = "sounddevice" },
+    { name = "starlette" },
+    { name = "uvicorn" },
 ]
 
 [package.metadata]
@@ -1342,6 +1344,8 @@ requires-dist = [
     { name = "scipy", specifier = ">=1.17.1" },
     { name = "setuptools", specifier = ">=70,<81" },
     { name = "sounddevice", specifier = ">=0.5.5" },
+    { name = "starlette", specifier = ">=0.41" },
+    { name = "uvicorn", specifier = ">=0.34" },
 ]
 
 [[package]]

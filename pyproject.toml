@@ -11,4 +11,6 @@ dependencies = [
     "scipy>=1.17.1",
     "setuptools>=70,<81",
     "sounddevice>=0.5.5",
+    "starlette>=0.41",
+    "uvicorn>=0.34",
 ]
