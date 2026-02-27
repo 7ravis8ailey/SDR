@@ -16,6 +16,7 @@ from ism import ISMDecoder
 from pager import PagerDecoder
 from aprs import APRSDecoder
 from trunking import TrunkRecorder
+from smart_tune import resolve_frequency
 
 mcp = FastMCP("SDR Lab")
 
@@ -318,6 +319,94 @@ def list_recordings() -> list[dict]:
                 "size_bytes": os.path.getsize(path),
             })
     return files
+
+
+# --- Smart tune tools ---
+
+
+@mcp.tool
+def smart_tune(frequency_mhz: float, gain: str = "auto") -> dict:
+    """Auto-detect the right decoder for a frequency and start listening.
+
+    Looks up the frequency in the database for known protocols (DMR, P25, etc.),
+    or uses band-based guessing, or falls back to dsd-fme auto-detection.
+    Returns the lookup result and decoder status.
+    """
+    info = resolve_frequency(frequency_mhz * 1e6)
+    dec = info["decoder"]
+    mode = info["mode"]
+
+    # Stop any active consumer and release device
+    if radio.device:
+        radio.close()
+        release_device("mcp")
+    for name, obj in [("digital", decoder), ("adsb", adsb_decoder),
+                      ("ism", ism_decoder), ("pager", pager_decoder),
+                      ("aprs", aprs_decoder), ("trunk", trunk_recorder)]:
+        if obj.active:
+            obj.stop()
+            release_device(name)
+
+    # Start the appropriate decoder
+    if dec == "adsb":
+        if not acquire_device("adsb"):
+            return {"error": "Device in use", **info}
+        try:
+            adsb_decoder.start(gain=gain)
+        except Exception as e:
+            release_device("adsb")
+            return {"error": str(e), **info}
+        return {**info, "status": adsb_decoder.get_status()}
+
+    if dec == "aprs":
+        if not acquire_device("aprs"):
+            return {"error": "Device in use", **info}
+        try:
+            aprs_decoder.start(frequency_hz=frequency_mhz * 1e6, gain=gain)
+        except Exception as e:
+            release_device("aprs")
+            return {"error": str(e), **info}
+        return {**info, "status": aprs_decoder.get_status()}
+
+    if dec == "ism":
+        if not acquire_device("ism"):
+            return {"error": "Device in use", **info}
+        try:
+            ism_decoder.start(frequency_hz=frequency_mhz * 1e6, gain=gain)
+        except Exception as e:
+            release_device("ism")
+            return {"error": str(e), **info}
+        return {**info, "status": ism_decoder.get_status()}
+
+    if dec == "digital":
+        if not acquire_device("digital"):
+            return {"error": "Device in use", **info}
+        try:
+            decoder.start(frequency_mhz * 1e6, mode, gain, 0)
+        except Exception as e:
+            release_device("digital")
+            return {"error": str(e), **info}
+        return {**info, "status": decoder.get_status()}
+
+    # Default: analog (rtl_fm)
+    if not acquire_device("digital"):
+        return {"error": "Device in use", **info}
+    try:
+        decoder.start(frequency_mhz * 1e6, mode, gain, 0)
+    except Exception as e:
+        release_device("digital")
+        return {"error": str(e), **info}
+    return {**info, "status": decoder.get_status()}
+
+
+@mcp.tool
+def lookup_frequency(frequency_mhz: float) -> dict:
+    """Look up what's known about a frequency without tuning to it.
+
+    Returns protocol type, decoder, tone, and description if known,
+    or a band-based guess for unknown frequencies.
+    """
+    return resolve_frequency(frequency_mhz * 1e6)
 
 
 # --- ADS-B decoder tools ---

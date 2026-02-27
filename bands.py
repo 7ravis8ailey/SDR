@@ -41,18 +41,150 @@ BANDS = {
     "walmart_elizabethton": (154.570e6, "nfm", 12.5e3, "Walmart Elizabethton"),
 }
 
-# Digital channel presets: name -> {freq, mode, description}
+# Frequency database: name -> {freq, protocol, decoder, mode, tone, description}
+#
+# protocol: analog_nfm, analog_am, analog_wfm, dmr, p25, nxdn, dstar, ysf, aprs, adsb, ism
+# decoder:  analog (rtl_fm), digital (dsd-fme), adsb (dump1090), aprs (direwolf),
+#           ism (rtl_433), pager (multimon-ng)
+# mode:     the mode flag passed to the decoder (nfm, am, wfm, dmr, p25, nxdn, dstar, ysf, auto)
+# tone:     CTCSS tone or DCS code, or None
+FREQUENCY_DB = {
+    # --- Carter County Public Safety — Analog ---
+    "carter_fire_dispatch": {
+        "freq": 154.295e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "100.0", "description": "Carter County Fire Dispatch",
+    },
+    "carter_sheriff_holston": {
+        "freq": 155.535e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "100.0", "description": "Carter County Sheriff - Holston Mtn",
+    },
+    "carter_sheriff_roan": {
+        "freq": 155.760e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "141.3", "description": "Carter County Sheriff - Roan Mtn",
+    },
+    "carter_ema": {
+        "freq": 155.385e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "179.9", "description": "Carter County EMA",
+    },
+    "ems_holston": {
+        "freq": 151.3925e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "DPL 025", "description": "EMS/Rescue - Holston Mtn",
+    },
+    "ems_white_rock": {
+        "freq": 151.0475e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "DPL 025", "description": "EMS/Rescue - White Rock",
+    },
+    "sycamore_hospital": {
+        "freq": 155.340e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": None, "description": "Sycamore Shoals Hospital HEAR",
+    },
+    "ems_dispatch_backup": {
+        "freq": 155.160e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "179.9", "description": "EMS Dispatch Backup",
+    },
+    "elizabethton_pd_tac": {
+        "freq": 155.940e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "100.0", "description": "Elizabethton PD Tac",
+    },
+    "carter_jail": {
+        "freq": 153.740e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "146.2", "description": "Carter County Jail",
+    },
+    # --- Carter County Public Safety — Digital ---
+    "elizabethton_pd_dispatch": {
+        "freq": 155.415e6, "protocol": "dmr", "decoder": "digital",
+        "mode": "dmr", "tone": None, "description": "Elizabethton Police Dispatch (DMR)",
+    },
+    "elizabethton_fire": {
+        "freq": 151.070e6, "protocol": "dmr", "decoder": "digital",
+        "mode": "dmr", "tone": None, "description": "Elizabethton Fire (DMR)",
+    },
+    # --- State/Federal — Digital ---
+    "tn_wildlife": {
+        "freq": 159.300e6, "protocol": "p25", "decoder": "digital",
+        "mode": "p25", "tone": None, "description": "TN Wildlife (P25)",
+    },
+    "tn_tbi_1": {
+        "freq": 460.525e6, "protocol": "p25", "decoder": "digital",
+        "mode": "p25", "tone": None, "description": "TN Bureau of Investigation (P25)",
+    },
+    "tn_tbi_2": {
+        "freq": 460.550e6, "protocol": "p25", "decoder": "digital",
+        "mode": "p25", "tone": None, "description": "TN Bureau of Investigation (P25)",
+    },
+    # --- Carter County Ham Repeaters — Analog FM ---
+    "wr4cc_2m": {
+        "freq": 146.700e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "77.0", "description": "WR4CC CCARA 2m Repeater",
+    },
+    "k4lns_2m": {
+        "freq": 145.110e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": None, "description": "K4LNS 2m Repeater - Holston Mtn",
+    },
+    "k4lns_2m_b": {
+        "freq": 147.270e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": None, "description": "K4LNS 2m Repeater - Holston Mtn",
+    },
+    "km4hdm_2m": {
+        "freq": 145.170e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": "123.0", "description": "KM4HDM 2m Repeater - Holston Mtn",
+    },
+    # --- Carter County Ham Repeaters — Digital ---
+    "ae2ey_dmr": {
+        "freq": 438.625e6, "protocol": "dmr", "decoder": "digital",
+        "mode": "dmr", "tone": None, "description": "AE2EY DMR/D-STAR Repeater (CC 1)",
+    },
+    "w4ysf_dmr": {
+        "freq": 440.525e6, "protocol": "dmr", "decoder": "digital",
+        "mode": "dmr", "tone": None, "description": "W4YSF DMR Repeater - Holston Mtn (CC 11)",
+    },
+    "ke4ccb_dmr": {
+        "freq": 442.700e6, "protocol": "dmr", "decoder": "digital",
+        "mode": "dmr", "tone": None, "description": "KE4CCB FM/DMR Repeater - Holston Mtn (CC 7)",
+    },
+    "k4lns_dmr": {
+        "freq": 444.100e6, "protocol": "dmr", "decoder": "digital",
+        "mode": "dmr", "tone": None, "description": "K4LNS DMR Repeater (CC 7)",
+    },
+    "ae2ey_nxdn": {
+        "freq": 447.875e6, "protocol": "nxdn", "decoder": "digital",
+        "mode": "nxdn", "tone": None, "description": "AE2EY NXDN Repeater",
+    },
+    "kc4ayx_p25": {
+        "freq": 920.000e6, "protocol": "p25", "decoder": "digital",
+        "mode": "p25", "tone": None, "description": "KC4AYX P25 Repeater (NAC 293)",
+    },
+    "kc4ayx_dstar": {
+        "freq": 1295.000e6, "protocol": "dstar", "decoder": "digital",
+        "mode": "dstar", "tone": None, "description": "KC4AYX D-STAR Repeater - Ripshin Ridge",
+    },
+    # --- Standard Frequencies ---
+    "noaa_weather_1": {
+        "freq": 162.400e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": None, "description": "NOAA Weather 1",
+    },
+    "noaa_weather_2": {
+        "freq": 162.425e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": None, "description": "NOAA Weather 2",
+    },
+    "noaa_weather_3": {
+        "freq": 162.450e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": None, "description": "NOAA Weather 3",
+    },
+    "marine_ch16": {
+        "freq": 156.800e6, "protocol": "analog_nfm", "decoder": "analog",
+        "mode": "nfm", "tone": None, "description": "Marine Distress/Calling Ch 16",
+    },
+    "aprs_na": {
+        "freq": 144.390e6, "protocol": "aprs", "decoder": "aprs",
+        "mode": "nfm", "tone": None, "description": "APRS North America (144.390 MHz)",
+    },
+}
+
+# Legacy alias for backward compatibility with existing code
 DIGITAL_CHANNELS = {
-    # Carter County / Elizabethton, TN — Analog
-    "carter_fire": {"freq": 154.295e6, "mode": "nfm", "description": "Carter County Fire Dispatch"},
-    "carter_sheriff_holston": {"freq": 155.535e6, "mode": "nfm", "description": "Carter County Sheriff - Holston Mtn"},
-    "carter_sheriff_roan": {"freq": 155.760e6, "mode": "nfm", "description": "Carter County Sheriff - Roan Mtn"},
-    "ems_holston": {"freq": 151.3925e6, "mode": "nfm", "description": "EMS/Rescue - Holston Mtn"},
-    "ems_white_rock": {"freq": 151.0475e6, "mode": "nfm", "description": "EMS/Rescue - White Rock"},
-    "elizabethton_pd": {"freq": 155.940e6, "mode": "nfm", "description": "Elizabethton PD Tac"},
-    "sycamore_hospital": {"freq": 155.340e6, "mode": "nfm", "description": "Sycamore Shoals Hospital HEAR"},
-    # Common digital trunking
-    "noaa_weather": {"freq": 162.400e6, "mode": "nfm", "description": "NOAA Weather 1"},
+    name: {"freq": ch["freq"], "mode": ch["mode"], "description": ch["description"]}
+    for name, ch in FREQUENCY_DB.items()
 }
 
 # RTL-SDR Blog V4 (R828D tuner) frequency range
