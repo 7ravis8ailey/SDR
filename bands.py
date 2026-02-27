@@ -37,6 +37,20 @@ BANDS = {
     "walmart_elizabethton": (154.570e6, "nfm", 12.5e3, "Walmart Elizabethton"),
 }
 
+# Digital channel presets: name -> {freq, mode, description}
+DIGITAL_CHANNELS = {
+    # Carter County / Elizabethton, TN — Analog
+    "carter_fire": {"freq": 154.295e6, "mode": "nfm", "description": "Carter County Fire Dispatch"},
+    "carter_sheriff_holston": {"freq": 155.535e6, "mode": "nfm", "description": "Carter County Sheriff - Holston Mtn"},
+    "carter_sheriff_roan": {"freq": 155.760e6, "mode": "nfm", "description": "Carter County Sheriff - Roan Mtn"},
+    "ems_holston": {"freq": 151.3925e6, "mode": "nfm", "description": "EMS/Rescue - Holston Mtn"},
+    "ems_white_rock": {"freq": 151.0475e6, "mode": "nfm", "description": "EMS/Rescue - White Rock"},
+    "elizabethton_pd": {"freq": 155.940e6, "mode": "nfm", "description": "Elizabethton PD Tac"},
+    "sycamore_hospital": {"freq": 155.340e6, "mode": "nfm", "description": "Sycamore Shoals Hospital HEAR"},
+    # Common digital trunking
+    "noaa_weather": {"freq": 162.400e6, "mode": "nfm", "description": "NOAA Weather 1"},
+}
+
 # RTL-SDR Blog V4 (R828D tuner) frequency range
 RTL_SDR_MIN_FREQ = 24e6
 RTL_SDR_MAX_FREQ = 1766e6

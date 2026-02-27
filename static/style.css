@@ -41,3 +41,5 @@ select { background: #1a1a1a; color: #0f0; border: 1px solid #444; padding: 4px;
 #digitalStatus { width: 100%; font-size: 12px; color: #f80; padding: 2px 0; }
 #digitalCalls { width: 100%; font-size: 11px; color: #888; max-height: 100px; overflow-y: auto; }
 #digitalCalls div { padding: 1px 0; border-bottom: 1px solid #1a1a1a; }
+#recordBtn.recording { background: #f00; color: #fff; }
+#recordStatus { font-size: 12px; color: #f00; }

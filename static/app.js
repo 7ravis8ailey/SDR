@@ -364,6 +364,36 @@ async function runScan() {
     btn.textContent = "Scan";
 }
 
+// --- Recording ---
+
+async function recordAudio() {
+    const btn = $("recordBtn");
+    const duration = parseFloat($("recordDuration").value);
+    const mode = document.querySelector(".mode-btn.active").dataset.mode;
+
+    btn.disabled = true;
+    btn.classList.add("recording");
+    btn.textContent = `Recording ${duration}s...`;
+    $("recordStatus").textContent = "";
+
+    try {
+        const resp = await fetch("/api/record", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ duration_seconds: duration, mode }),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || `Failed: ${resp.status}`);
+        $("recordStatus").textContent = `Saved: ${data.filename} (${data.duration_seconds}s)`;
+    } catch (e) {
+        $("recordStatus").textContent = "Error: " + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove("recording");
+        btn.textContent = "Record";
+    }
+}
+
 // --- Digital Monitor ---
 
 function showDigitalOverlay(msg) {

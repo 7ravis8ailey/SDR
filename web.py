@@ -2,6 +2,8 @@ import os
 import sys
 import asyncio
 import logging
+import time
+import wave
 
 import numpy as np
 from starlette.applications import Starlette
@@ -20,6 +22,7 @@ from digital import DigitalVoiceDecoder
 log = logging.getLogger("sdr.web")
 MOCK = "--mock" in sys.argv
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+RECORDINGS_DIR = os.path.join(BASE_DIR, "recordings")
 
 radio = SDR()
 decoder = DigitalVoiceDecoder()
@@ -227,6 +230,63 @@ async def digital_calls(request):
     return JSONResponse(decoder.get_calls())
 
 
+# --- Recording endpoints ---
+
+
+async def record(request):
+    body = await request.json()
+    duration = body.get("duration_seconds", 10.0)
+    mode = body.get("mode", state["mode"])
+
+    os.makedirs(RECORDINGS_DIR, exist_ok=True)
+    freq_str = f"{state['freq'] / 1e6:.3f}MHz"
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    filename = f"{timestamp}_{freq_str}_{mode}.wav"
+    filepath = os.path.join(RECORDINGS_DIR, filename)
+
+    if MOCK:
+        num_samples = int(state["sample_rate"] * duration)
+        iq = mock_samples(num_samples)
+    else:
+        if not radio.device:
+            return JSONResponse({"error": "Device not open. Start streaming first."}, status_code=400)
+        num_samples = int(state["sample_rate"] * duration)
+        iq = await asyncio.to_thread(radio.read_samples, num_samples)
+
+    audio = await asyncio.to_thread(
+        demodulate, iq, mode, state["sample_rate"], state["audio_rate"]
+    )
+    pcm = (np.clip(audio, -1, 1) * 32767).astype(np.int16)
+
+    with wave.open(filepath, "w") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(state["audio_rate"])
+        wf.writeframes(pcm.tobytes())
+
+    return JSONResponse({
+        "filename": filename,
+        "duration_seconds": round(len(audio) / state["audio_rate"], 2),
+        "frequency_mhz": state["freq"] / 1e6,
+        "mode": mode,
+        "size_bytes": os.path.getsize(filepath),
+    })
+
+
+async def list_recordings(request):
+    if not os.path.exists(RECORDINGS_DIR):
+        return JSONResponse([])
+    files = []
+    for f in sorted(os.listdir(RECORDINGS_DIR), reverse=True):
+        if f.endswith(".wav"):
+            path = os.path.join(RECORDINGS_DIR, f)
+            files.append({
+                "filename": f,
+                "size_bytes": os.path.getsize(path),
+            })
+    return JSONResponse(files)
+
+
 # --- WebSocket ---
 
 
@@ -329,6 +389,8 @@ app = Starlette(
         Route("/api/digital/stop", digital_stop, methods=["POST"]),
         Route("/api/digital/status", digital_status, methods=["GET"]),
         Route("/api/digital/calls", digital_calls, methods=["GET"]),
+        Route("/api/record", record, methods=["POST"]),
+        Route("/api/recordings", list_recordings, methods=["GET"]),
         WebSocketRoute("/ws", ws_stream),
         Mount("/", StaticFiles(directory=os.path.join(BASE_DIR, "static"), html=True)),
     ],
